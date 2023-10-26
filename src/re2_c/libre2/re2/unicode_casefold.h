@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+#ifndef RE2_UNICODE_CASEFOLD_H_
+#define RE2_UNICODE_CASEFOLD_H_
+
 // Unicode case folding tables.
 
 // The Unicode case folding tables encode the mapping from one Unicode point
@@ -36,10 +39,10 @@
 // The grouped form also allows for efficient fold range calculations
 // rather than looping one character at a time.
 
-#ifndef RE2_UNICODE_CASEFOLD_H__
-#define RE2_UNICODE_CASEFOLD_H__
+#include <stdint.h>
 
 #include "util/util.h"
+#include "util/utf.h"
 
 namespace re2 {
 
@@ -53,7 +56,7 @@ enum {
 struct CaseFold {
   Rune lo;
   Rune hi;
-  int32 delta;
+  int32_t delta;
 };
 
 extern const CaseFold unicode_casefold[];
@@ -72,4 +75,4 @@ extern Rune ApplyFold(const CaseFold *f, Rune r);
 
 }  // namespace re2
 
-#endif  // RE2_UNICODE_CASEFOLD_H__
+#endif  // RE2_UNICODE_CASEFOLD_H_

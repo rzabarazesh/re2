@@ -4,8 +4,15 @@
 
 // Regular expression engine tester -- test all the implementations against each other.
 
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+#include <string>
+
 #include "util/util.h"
 #include "util/flags.h"
+#include "util/logging.h"
+#include "util/strutil.h"
 #include "re2/testing/tester.h"
 #include "re2/prog.h"
 #include "re2/re2.h"
@@ -26,7 +33,7 @@ enum {
   kMaxSubmatch = 1+16,  // $0...$16
 };
 
-const char* engine_types[kEngineMax] = {
+const char* engine_names[kEngineMax] = {
   "Backtrack",
   "NFA",
   "DFA",
@@ -39,18 +46,18 @@ const char* engine_types[kEngineMax] = {
   "PCRE",
 };
 
-// Returns the name string for the type t.
-static string EngineString(Engine t) {
-  if (t < 0 || t >= arraysize(engine_types) || engine_types[t] == NULL) {
-    return StringPrintf("type%d", static_cast<int>(t));
-  }
-  return engine_types[t];
+// Returns the name of the engine.
+static const char* EngineName(Engine e) {
+  CHECK_GE(e, 0);
+  CHECK_LT(e, arraysize(engine_names));
+  CHECK(engine_names[e] != NULL);
+  return engine_names[e];
 }
 
 // Returns bit mask of engines to use.
 static uint32_t Engines() {
-  static uint32_t cached_engines;
-  static bool did_parse;
+  static bool did_parse = false;
+  static uint32_t cached_engines = 0;
 
   if (did_parse)
     return cached_engines;
@@ -59,7 +66,7 @@ static uint32_t Engines() {
     cached_engines = ~0;
   } else {
     for (Engine i = static_cast<Engine>(0); i < kEngineMax; i++)
-      if (strstr(EngineString(i).c_str(), FLAGS_regexp_engines.c_str()))
+      if (FLAGS_regexp_engines.find(EngineName(i)) != std::string::npos)
         cached_engines |= 1<<i;
   }
 
@@ -69,8 +76,9 @@ static uint32_t Engines() {
     cached_engines &= ~(1<<kEnginePCRE);
   for (Engine i = static_cast<Engine>(0); i < kEngineMax; i++) {
     if (cached_engines & (1<<i))
-      LOG(INFO) << EngineString(i) << " enabled";
+      LOG(INFO) << EngineName(i) << " enabled";
   }
+
   did_parse = true;
   return cached_engines;
 }
@@ -89,24 +97,24 @@ typedef TestInstance::Result Result;
 
 // Formats a single capture range s in text in the form (a,b)
 // where a and b are the starting and ending offsets of s in text.
-static string FormatCapture(const StringPiece& text, const StringPiece& s) {
+static std::string FormatCapture(const StringPiece& text,
+                                 const StringPiece& s) {
   if (s.begin() == NULL)
     return "(?,?)";
-  return StringPrintf("(%d,%d)",
-                      static_cast<int>(s.begin() - text.begin()),
-                      static_cast<int>(s.end() - text.begin()));
+  return StringPrintf("(%td,%td)",
+                      s.begin() - text.begin(), s.end() - text.begin());
 }
 
 // Returns whether text contains non-ASCII (>= 0x80) bytes.
 static bool NonASCII(const StringPiece& text) {
-  for (int i = 0; i < text.size(); i++)
-    if ((uint8)text[i] >= 0x80)
+  for (size_t i = 0; i < text.size(); i++)
+    if ((uint8_t)text[i] >= 0x80)
       return true;
   return false;
 }
 
 // Returns string representation of match kind.
-static string FormatKind(Prog::MatchKind kind) {
+static std::string FormatKind(Prog::MatchKind kind) {
   switch (kind) {
     case Prog::kFullMatch:
       return "full match";
@@ -121,7 +129,7 @@ static string FormatKind(Prog::MatchKind kind) {
 }
 
 // Returns string representation of anchor kind.
-static string FormatAnchor(Prog::Anchor anchor) {
+static std::string FormatAnchor(Prog::Anchor anchor) {
   switch (anchor) {
     case Prog::kAnchored:
       return "anchored";
@@ -133,7 +141,7 @@ static string FormatAnchor(Prog::Anchor anchor) {
 
 struct ParseMode {
   Regexp::ParseFlags parse_flags;
-  string desc;
+  std::string desc;
 };
 
 static const Regexp::ParseFlags single_line =
@@ -149,11 +157,11 @@ static ParseMode parse_modes[] = {
   { multi_line|Regexp::Latin1,     "multiline, latin1"    },
 };
 
-static string FormatMode(Regexp::ParseFlags flags) {
+static std::string FormatMode(Regexp::ParseFlags flags) {
   for (int i = 0; i < arraysize(parse_modes); i++)
     if (parse_modes[i].parse_flags == flags)
       return parse_modes[i].desc;
-  return StringPrintf("%#x", static_cast<uint>(flags));
+  return StringPrintf("%#x", static_cast<uint32_t>(flags));
 }
 
 // Constructs and saves all the matching engines that
@@ -213,7 +221,7 @@ TestInstance::TestInstance(const StringPiece& regexp_str, Prog::MatchKind kind,
   }
 
   // Create re string that will be used for RE and RE2.
-  string re = regexp_str.as_string();
+  std::string re = std::string(regexp_str);
   // Accomodate flags.
   // Regexp::Latin1 will be accomodated below.
   if (!(flags & Regexp::OneLine))
@@ -281,8 +289,10 @@ void TestInstance::RunSearch(Engine type,
                              const StringPiece& orig_text,
                              const StringPiece& orig_context,
                              Prog::Anchor anchor,
-                             Result *result) {
-  memset(result, 0, sizeof *result);
+                             Result* result) {
+  // Result is not trivial, so we cannot freely clear it with memset(3),
+  // but zeroing objects like so is safe and expedient for our purposes.
+  memset(reinterpret_cast<void*>(result), 0, sizeof *result);
   if (regexp_ == NULL) {
     result->skipped = true;
     return;
@@ -355,8 +365,8 @@ void TestInstance::RunSearch(Engine type,
 
     case kEngineOnePass:
       if (prog_ == NULL ||
-          anchor == Prog::kUnanchored ||
           !prog_->IsOnePass() ||
+          anchor == Prog::kUnanchored ||
           nsubmatch > Prog::kMaxOnePassCapture) {
         result->skipped = true;
         break;
@@ -367,7 +377,8 @@ void TestInstance::RunSearch(Engine type,
       break;
 
     case kEngineBitState:
-      if (prog_ == NULL) {
+      if (prog_ == NULL ||
+          !prog_->CanBitState()) {
         result->skipped = true;
         break;
       }
@@ -392,10 +403,13 @@ void TestInstance::RunSearch(Engine type,
       if (kind_ == Prog::kFullMatch)
         re_anchor = RE2::ANCHOR_BOTH;
 
-      result->matched = re2_->Match(context,
-                                    text.begin() - context.begin(),
-                                    text.end() - context.begin(),
-                                    re_anchor, result->submatch, nsubmatch);
+      result->matched = re2_->Match(
+          context,
+          static_cast<size_t>(text.begin() - context.begin()),
+          static_cast<size_t>(text.end() - context.begin()),
+          re_anchor,
+          result->submatch,
+          nsubmatch);
       result->have_submatch = nsubmatch > 0;
       break;
     }
@@ -407,10 +421,23 @@ void TestInstance::RunSearch(Engine type,
         break;
       }
 
+      // In Perl/PCRE, \v matches any character considered vertical
+      // whitespace, not just vertical tab. Regexp::MimicsPCRE() is
+      // unable to handle all cases of this, unfortunately, so just
+      // catch them here. :(
+      if (regexp_str_.find("\\v") != StringPiece::npos &&
+          (text.find('\n') != StringPiece::npos ||
+           text.find('\f') != StringPiece::npos ||
+           text.find('\r') != StringPiece::npos)) {
+        result->skipped = true;
+        break;
+      }
+
       // PCRE 8.34 or so started allowing vertical tab to match \s,
       // following a change made in Perl 5.18. RE2 does not.
-      if ((regexp_str_.contains("\\s") || regexp_str_.contains("\\S")) &&
-          text.contains("\v")) {
+      if ((regexp_str_.find("\\s") != StringPiece::npos ||
+           regexp_str_.find("\\S") != StringPiece::npos) &&
+          text.find('\v') != StringPiece::npos) {
         result->skipped = true;
         break;
       }
@@ -421,7 +448,7 @@ void TestInstance::RunSearch(Engine type,
         a[i] = PCRE::Arg(&result->submatch[i]);
         argptr[i] = &a[i];
       }
-      int consumed;
+      size_t consumed;
       PCRE::Anchor pcre_anchor;
       if (anchor == Prog::kAnchored)
         pcre_anchor = PCRE::ANCHOR_START;
@@ -442,14 +469,6 @@ void TestInstance::RunSearch(Engine type,
         break;
       }
       result->have_submatch = true;
-
-      // Work around RE interface bug: PCRE returns -1 as the
-      // offsets for an unmatched subexpression, and RE should
-      // turn that into StringPiece(NULL) but in fact it uses
-      // StringPiece(text.begin() - 1, 0).  Oops.
-      for (int i = 0; i < nsubmatch; i++)
-        if (result->submatch[i].begin() == text.begin() - 1)
-          result->submatch[i] = NULL;
       delete[] argptr;
       delete[] a;
       break;
@@ -515,7 +534,7 @@ bool TestInstance::RunCase(const StringPiece& text, const StringPiece& context,
     }
 
     // We disagree with PCRE on the meaning of some Unicode matches.
-    // In particular, we treat all non-ASCII UTF-8 as word characters.
+    // In particular, we treat non-ASCII UTF-8 as non-word characters.
     // We also treat "empty" character sets like [^\w\W] as being
     // impossible to match, while PCRE apparently excludes some code
     // points (e.g., 0x0080) from both \w and \W.
@@ -563,7 +582,7 @@ void TestInstance::LogMatch(const char* prefix, Engine e,
                             const StringPiece& text, const StringPiece& context,
                             Prog::Anchor anchor) {
   LOG(INFO) << prefix
-    << EngineString(e)
+    << EngineName(e)
     << " regexp "
     << CEscape(regexp_str_)
     << " "
