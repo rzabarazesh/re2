@@ -44,6 +44,7 @@ int compare_options(const RE2::RE2::Options& A, const RE2::RE2::Options& B) {
 }
 
 using namespace re2;
+using std::string;
 
 extern "C" {
 
