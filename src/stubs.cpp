@@ -45,12 +45,12 @@ int compare_options(const RE2::RE2::Options& A, const RE2::RE2::Options& B) {
 
 using namespace re2;
 using std::string;
-
+#include "ocaml_utils.h"
 extern "C" {
 
 #include <limits.h>
 #include <assert.h>
-#include <arpa/inet.h>
+
 #include <stdarg.h>
 
 #include <caml/mlvalues.h>
@@ -62,7 +62,7 @@ extern "C" {
 #include <caml/intext.h>
 #include <caml/custom.h>
 
-#include "ocaml_utils.h"
+
 #include "util.h"
 
   void mlre2__custom_regex_finalize(value v_obj) {
