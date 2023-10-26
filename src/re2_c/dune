@@ -2,25 +2,29 @@
  (c_library_flags :standard -lstdc++ -lpthread)
  (self_build_stubs_archive (re2_c)))
 
-(rule (targets libre2_c_stubs.a dllre2_c_stubs.so)
+
+(rule (targets libre2_c_stubs.a dllre2_c_stubs.so dllre2_c_stubs.dll)
  (deps (source_tree libre2))
  (action
-  (bash
-    "\
+  (bash "\
    \nARFLAGS=rsc\
    \nCXXFLAGS=\"-Wall -O3 -g -pthread\"\
-   \nif [ FreeBSD = `uname -s` ]; then\
-   \n     CXX=clang++\
-   \n     CXXFLAGS=\"$CXXFLAGS -I /usr/local/lib/re2\"\
+   \nOS=\"$(uname -s)\"\
+   \nif [ \"$OS\" = 'FreeBSD' ]; then\
+   \n CXX=clang++\
+   \n CXXFLAGS=\"$CXXFLAGS -I /usr/local/lib/re2\"\
+   \nelif [[ \"$OS\" == CYGWIN* ]]; then\
+   \n CXX=x86_64-w64-mingw32-g++\
    \nelse\
-   \n     CXX=g++\
+   \n CXX=g++\
    \nfi\
    \nif ! %{arch_sixtyfour}; then\
    \nCXX=\"$CXX -m32\"\
    \nfi\
-   \n%{make} -s -C libre2 clean\
-   \n%{make} -s -C libre2 ARFLAGS=\"$ARFLAGS\" CXX=\"$CXX\" CXXFLAGS=\"$CXXFLAGS\" obj/libre2.a obj/so/libre2.so\
+   \nmake -s -C libre2 clean\
+   \nmake -s -C libre2 ARFLAGS=\"$ARFLAGS\" CXX=\"$CXX\" CXXFLAGS=\"$CXXFLAGS\" obj/libre2.a obj/so/libre2.so\
    \ncp libre2/obj/libre2.a libre2_c_stubs.a\
    \ncp libre2/obj/so/libre2.so dllre2_c_stubs.so\
-   \n%{make} -s -C libre2 clean\
+   \ncp libre2/obj/so/libre2.so dllre2_c_stubs.dll\
+   \nmake -s -C libre2 clean\
    \n")))
