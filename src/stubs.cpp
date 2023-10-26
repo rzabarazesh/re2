@@ -81,7 +81,7 @@ extern "C" {
     } else return compare_options(re1->options(), re2->options());
   }
 
-  long mlre2__custom_regex_hash(value v) {
+  int64_t mlre2__custom_regex_hash(value v) {
     /* invariant: if compare(a, b) == 0 then hash(a) == hash(b)
 
        Since we ignore the options, two regexes with the same pattern
@@ -92,7 +92,7 @@ extern "C" {
        This is hash_aux in hash.c, specialized for strings.
     */
 #define Beta 19
-    long hash = 0;
+    int64_t hash = 0;
     const char *s = Regex_val(v)->pattern().c_str();
     const char *end = s + Regex_val(v)->pattern().length();
     for (/* empty */; s < end; ++s) hash = hash * Beta + *s;
@@ -110,8 +110,8 @@ extern "C" {
      (3  bits) zero
   */
 
-  void mlre2__custom_regex_serialize(value v, unsigned long * wsize_32,
-                                     unsigned long * wsize_64) {
+  void mlre2__custom_regex_serialize(value v, uint64_t * wsize_32,
+                                     uint64_t * wsize_64) {
     RE2 *re = Regex_val(v);
     size_t len = re->pattern().length() + 1;
     if (len > INT_MAX) {
@@ -129,7 +129,7 @@ extern "C" {
     *wsize_64 = 8;
   }
 
-  unsigned long mlre2__custom_regex_deserialize(void * dst) {
+  uint64_t mlre2__custom_regex_deserialize(void * dst) {
     int len = caml_deserialize_sint_4();
     RE2::Options options;
     char * pattern = (char *) caml_stat_alloc(sizeof(*pattern) * (len));
