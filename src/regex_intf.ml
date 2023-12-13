@@ -89,6 +89,10 @@ runs even faster if nmatch == 0. v}
       [RE2::NumberOfCapturingGroups()] ignores the whole match ("subpattern zero").
   *)
   val num_submatches : t -> int
+  
+  (** [get_named_capturing_groups t] returns a map from names of capturing groups
+      in t to their indices. *)
+      val get_named_capturing_groups : t -> Int.t String.Map.t
 
   (** [pattern t] returns the pattern from which the regex was constructed. *)
   val pattern : t -> string

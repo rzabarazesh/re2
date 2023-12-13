@@ -11,12 +11,13 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
 ]
 depends: [
-  "ocaml"       {>= "4.08.0"}
-  "core"        {>= "v0.15" & < "v0.16"}
-  "core_kernel" {>= "v0.15" & < "v0.16"}
-  "ppx_jane"    {>= "v0.15" & < "v0.16"}
-  "conf-g++"    {build}
-  "dune"        {>= "2.0.0"}
+  "ocaml"             {>= "4.14.0"}
+  "core"              {>= "v0.16" & < "v0.17"}
+  "jane_rope"         {>= "v0.16" & < "v0.17"}
+  "ppx_jane"          {>= "v0.16" & < "v0.17"}
+  "regex_parser_intf" {>= "v0.16" & < "v0.17"}
+  "conf-g++"          {build}
+  "dune"              {>= "2.0.0"}
 ]
 synopsis: "OCaml bindings for RE2, Google's regular expression library"
 description: "

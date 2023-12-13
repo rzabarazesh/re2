@@ -296,6 +296,30 @@ extern "C" {
     } else return Val_int(it->second);
   }
 
+  /* returns (string * int) list -- i.e. the association list
+   * of Regex_val(v_regex)->NamedCapturingGroups()
+   */
+  CAMLprim value mlre2__get_named_capturing_groups(value v_regex) {
+    CAMLparam1(v_regex);
+    CAMLlocal3(v_retval, v_group, v_cons);
+    v_retval = Val_emptylist;
+
+    std::map<string, int> capturing_groups = Regex_val(v_regex)->NamedCapturingGroups();
+    std::map<string, int>::iterator it;
+
+    for (it = capturing_groups.begin(); it != capturing_groups.end(); it++) {
+      v_group = caml_alloc_tuple(2);
+      Store_field(v_group, 0, caml_copy_string(it->first.c_str()));
+      Store_field(v_group, 1, Val_int(it->second));
+
+      v_cons = caml_alloc(2, Tag_cons);
+      Store_field(v_cons, 0, v_group);
+      Store_field(v_cons, 1, v_retval);
+      v_retval = v_cons;
+    }
+    CAMLreturn(v_retval);
+  }
+  
   CAMLprim value mlre2__pattern(value v_regex) {
     return caml_copy_string(Regex_val(v_regex)->pattern().c_str());
   }

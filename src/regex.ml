@@ -17,6 +17,10 @@ external cre2__init : unit -> unit = "mlre2__init"
 external cre2__create_re : Options.Private.C_repr.t -> string -> t = "mlre2__create_re"
 external cre2__num_submatches : t -> int = "mlre2__num_submatches" [@@noalloc]
 external cre2__submatch_index : t -> string -> int = "mlre2__submatch_index" [@@noalloc]
+external cre2__get_named_capturing_groups
+  :  t
+  -> (string * int) list
+  = "mlre2__get_named_capturing_groups"
 external cre2__pattern : t -> string = "mlre2__pattern"
 external cre2__options : t -> Options.Private.C_repr.t = "mlre2__options"
 
@@ -106,6 +110,9 @@ let create_exn ?(options = Options.default) pat =
 
 let create ?options pat = Or_error.try_with (fun () -> create_exn ?options pat)
 let num_submatches t = cre2__num_submatches t
+let get_named_capturing_groups t =
+  String.Map.of_alist_exn (cre2__get_named_capturing_groups t)
+;;
 let pattern t = cre2__pattern t
 let options t = cre2__options t |> Options.Private.of_c_repr
 let of_string pat = create_exn pat
